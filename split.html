@@ -779,7 +779,6 @@ function renderAnalysis(){
 
   document.getElementById('analysisGrid').innerHTML=`
     <div class="analysis-card"><h3>Spending by Category</h3>${catRows||'<p style="color:var(--muted);font-size:13px">No data yet</p>'}</div>
-    <div class="analysis-card"><h3>Who Paid What</h3>${personRows}</div>
     <div class="analysis-card"><h3>Spending by Day</h3>${dayRows||'<p style="color:var(--muted);font-size:13px">No dates entered</p>'}</div>
     <div class="analysis-card"><h3>Quick Stats</h3>
       <div class="psc-row" style="padding:6px 0;border-bottom:1px dashed var(--border)"><span class="psc-label">Total expenses</span><span class="psc-val">€${grand.toFixed(2)}</span></div>
