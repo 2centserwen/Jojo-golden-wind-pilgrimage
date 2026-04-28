@@ -230,19 +230,7 @@ input,select,button{font-family:var(--body);}
 
   <!-- People -->
   <div class="people-bar" id="peopleBar"></div>
-
-  <!-- Import -->
-  <div class="import-zone" id="importZone" onclick="document.getElementById('xlsInput').click()"
-       ondragover="e=>e.preventDefault()" ondrop="handleDrop(event)">
-    <div class="icon">📂</div>
-    <p>Drag & drop your XLS/XLSX file here, or click to browse</p>
-    <p style="font-size:11px;margin-top:4px;">Expects: Date | Item | Person columns | Notes</p>
-    <label class="import-btn-label" onclick="event.stopPropagation()">
-      <input type="file" id="xlsInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importXLS(this)">
-      Browse file
-    </label>
-  </div>
-
+  
   <!-- Add / Edit form -->
   <div class="form-card" id="formCard">
     <div class="form-card-title">
