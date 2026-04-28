@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trip Split</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer onerror="window._xlsxFailed=true"></script>
+<style>
+:root {
+  --ink: #0F0F0F; --paper: #F8F5F0; --card: #FFFFFF;
+  --border: #E4DDD4; --muted: #8A8178;
+  --p0: #E8547A; --p1: #3B82F6; --p2: #10B981; --p3: #F59E0B; --p4: #8B5CF6;
+  --eur: #2D6A4F; --usd: #1D4ED8; --gbp: #7C3AED;
+  --radius: 14px; --mono: 'JetBrains Mono', monospace; --body: 'Outfit', sans-serif; --serif: 'Playfair Display', serif;
+  --shadow: 0 2px 8px rgba(0,0,0,.06), 0 8px 32px rgba(0,0,0,.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--body);background:var(--paper);color:var(--ink);min-height:100vh;}
+input,select,button{font-family:var(--body);}
+
+/* ── HEADER ── */
+.app-header{background:var(--ink);color:#fff;padding:24px 32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.app-title{font-family:var(--serif);font-size:1.75rem;flex:1;min-width:180px;}
+.app-title span{color:#86EFAC;}
+.trip-name-input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-family:var(--serif);font-size:1rem;padding:7px 14px;outline:none;width:220px;}
+.trip-name-input::placeholder{color:rgba(255,255,255,.35);}
+.trip-name-input:focus{border-color:#86EFAC;}
+
+/* ── NAV TABS ── */
+.nav-tabs{background:var(--ink);border-bottom:1px solid rgba(255,255,255,.1);padding:0 32px;display:flex;gap:0;}
+.nav-tab{color:rgba(255,255,255,.5);padding:12px 20px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:.03em;}
+.nav-tab:hover{color:rgba(255,255,255,.8);}
+.nav-tab.active{color:#86EFAC;border-bottom-color:#86EFAC;}
+
+/* ── FX BAR ── */
+.fx-bar{background:#FFFBEB;border-bottom:1px solid #FDE68A;padding:9px 32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.fx-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#92400E;font-weight:500;}
+.fx-bucket{display:flex;align-items:center;gap:8px;}
+.fx-bucket-label{font-family:var(--mono);font-size:12px;font-weight:600;}
+.fx-input{font-family:var(--mono);font-size:12px;width:68px;padding:3px 7px;border:1px solid #FDE68A;border-radius:6px;background:#fff;color:#92400E;outline:none;}
+.fx-input:focus{border-color:#D97706;}
+.fx-total{font-family:var(--mono);font-size:11px;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:4px;margin-left:6px;}
+
+/* ── SECTION ── */
+.section{padding:28px 32px;max-width:1500px;}
+.section-hidden{display:none;}
+
+/* ── PEOPLE MANAGER ── */
+.people-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.person-chip{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 10px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:500;cursor:default;}
+.person-chip .pdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.person-chip input{border:none;outline:none;background:transparent;font-family:var(--body);font-size:13px;font-weight:500;width:70px;}
+.person-chip .rm-person{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 0 0 4px;line-height:1;}
+.person-chip .rm-person:hover{color:#E8547A;}
+.add-person-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;border:1.5px dashed var(--border);background:transparent;font-size:13px;color:var(--muted);cursor:pointer;transition:all .15s;}
+.add-person-btn:hover{border-color:var(--ink);color:var(--ink);}
+
+/* ── ADD FORM ── */
+.form-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);padding:22px;margin-bottom:24px;}
+.form-card-title{font-family:var(--serif);font-size:1rem;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.form-row{display:grid;grid-template-columns:1.8fr 1fr 90px 80px 80px;gap:10px;margin-bottom:12px;}
+@media(max-width:900px){.form-row{grid-template-columns:1fr 1fr;}}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-family:var(--mono);}
+.field input,.field select{padding:8px 11px;border:1.5px solid var(--border);border-radius:9px;font-size:13.5px;color:var(--ink);background:var(--card);outline:none;transition:border-color .15s;}
+.field input:focus,.field select:focus{border-color:var(--ink);}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+@media(max-width:700px){.two-col{grid-template-columns:1fr;}}
+.sub-section{background:#F8F5F0;border-radius:10px;padding:14px;}
+.sub-label{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-family:var(--mono);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+
+/* paid rows */
+.paid-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.paid-row:last-child{margin-bottom:0;}
+.paid-row-name{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;width:80px;flex-shrink:0;}
+.paid-row input{font-family:var(--mono);font-size:13px;padding:6px 9px;border:1.5px solid var(--border);border-radius:8px;flex:1;outline:none;transition:border-color .15s;background:var(--card);}
+.paid-row input:focus{border-color:#3B82F6;}
+.paid-hint{font-family:var(--mono);font-size:10px;color:var(--muted);min-width:70px;}
+
+/* share rows */
+.share-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.share-row:last-child{margin-bottom:0;}
+.chip-toggle input{display:none;}
+.chip-face{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:16px;border:1.5px solid var(--border);background:var(--card);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.share-amount-wrap{flex:1;position:relative;}
+.share-amount-wrap::before{content:'€';position:absolute;left:8px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:11px;color:var(--muted);pointer-events:none;}
+.share-amount-wrap input{font-family:var(--mono);font-size:13px;padding:6px 9px 6px 20px;border:1.5px solid var(--border);border-radius:8px;width:100%;outline:none;background:var(--card);transition:border-color .15s,opacity .15s;}
+.share-amount-wrap input:focus{border-color:#10B981;}
+.share-amount-wrap input:disabled{opacity:.3;background:#F0EDE6;cursor:not-allowed;}
+.share-status{font-family:var(--mono);font-size:10px;padding:5px 9px;border-radius:6px;margin-top:8px;}
+.ss-ok{background:#D1FAE5;color:#065F46;}
+.ss-over{background:#FEE2E2;color:#991B1B;}
+.ss-auto{background:#FEF3C7;color:#92400E;}
+
+.form-actions{display:flex;gap:10px;align-items:center;}
+.btn-primary{background:var(--ink);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:13.5px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;display:flex;align-items:center;gap:7px;}
+.btn-primary:hover{opacity:.85;}
+.btn-primary:active{transform:scale(.98);}
+.btn-ghost{background:transparent;border:1.5px solid var(--border);border-radius:9px;padding:9px 18px;font-size:13px;color:var(--muted);cursor:pointer;transition:all .15s;}
+.btn-ghost:hover{border-color:var(--ink);color:var(--ink);}
+
+/* ── EXPENSE TABLE ── */
+.table-wrap{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px;}
+.table-head-bar{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.table-head-bar h3{font-family:var(--serif);font-size:1rem;}
+.pill{font-family:var(--mono);font-size:11px;color:var(--muted);background:#F0EDE6;padding:3px 10px;border-radius:12px;}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{text-align:left;padding:9px 13px;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#F8F5F0;border-bottom:1px solid var(--border);font-family:var(--mono);white-space:nowrap;}
+.tbl th.h-paid{color:#1D4ED8;background:#EFF6FF;border-bottom:2px solid #BFDBFE;}
+.tbl th.h-share{color:#065F46;background:#F0FDF4;border-bottom:2px solid #6EE7B7;}
+.tbl td{padding:9px 13px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:#FAFAF9;}
+.tbl tr.editing td{background:#FFFBEB!important;}
+.tbl td.c-paid{background:#F8FBFF;}
+.tbl td.c-share{background:#F6FEF9;}
+.tbl td.mono{font-family:var(--mono);font-size:12px;}
+.ccy-tag{display:inline-block;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600;margin-left:4px;vertical-align:middle;}
+.ccy-EUR{background:#D1FAE5;color:#065F46;}
+.ccy-USD{background:#DBEAFE;color:#1E40AF;}
+.ccy-GBP{background:#EDE9FE;color:#5B21B6;}
+.custom-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:4px;background:#FEF3C7;color:#92400E;font-family:var(--mono);margin-left:3px;vertical-align:middle;}
+.skip-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:4px;background:#F0EDE6;color:#8A8178;font-family:var(--mono);margin-left:3px;vertical-align:middle;}
+.row-actions{display:flex;gap:4px;}
+.icon-btn{background:none;border:1px solid transparent;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;}
+.icon-btn:hover{border-color:var(--border);color:var(--ink);}
+.icon-btn.del:hover{background:#FEE2E2;color:#B91C1C;border-color:#FECACA;}
+.empty-state{text-align:center;padding:40px;color:var(--muted);font-size:13px;}
+
+/* ── CURRENCY TOTALS BAR ── */
+.ccy-totals{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;}
+.ccy-card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:12px 18px;flex:1;min-width:120px;}
+.ccy-card-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.ccy-card-total{font-family:var(--mono);font-size:1.15rem;font-weight:500;}
+.ccy-card-eur{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── SETTLEMENT ── */
+.settle-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;}
+.person-settle-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:18px;position:relative;overflow:hidden;cursor:pointer;transition:box-shadow .15s;}
+.person-settle-card:hover{box-shadow:var(--shadow);}
+.person-settle-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.psc-name{font-family:var(--serif);font-size:1.05rem;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.psc-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;}
+.psc-label{color:var(--muted);}
+.psc-val{font-family:var(--mono);font-size:12px;}
+.balance-pill{margin-top:10px;padding:8px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;font-weight:500;text-align:center;}
+.bp-pos{background:#D1FAE5;color:#065F46;}
+.bp-neg{background:#FEE2E2;color:#991B1B;}
+.bp-zero{background:#F0EDE6;color:#8A8178;}
+
+.transfers-box{background:var(--ink);border-radius:var(--radius);padding:22px;margin-bottom:20px;}
+.transfers-box h3{font-family:var(--serif);font-size:1.1rem;color:#86EFAC;margin-bottom:14px;}
+.transfer-line{display:flex;align-items:center;gap:10px;padding:9px 13px;background:rgba(255,255,255,.07);border-radius:8px;margin-bottom:8px;font-size:13px;color:#fff;}
+.transfer-line .arrow{color:#86EFAC;font-size:16px;}
+.transfer-line .gbp-amt{font-family:var(--mono);font-weight:500;color:#FDE68A;margin-left:auto;}
+.transfer-line .eur-amt{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.4);margin-left:6px;}
+.no-transfer{color:#86EFAC;font-size:13px;padding:4px 0;}
+
+/* detail panel */
+.detail-panel{background:#F8F5F0;border-radius:10px;padding:14px;margin-top:10px;display:none;font-size:12px;}
+.detail-panel.open{display:block;}
+.detail-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--border);}
+.detail-row:last-child{border-bottom:none;}
+.expand-btn{font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;margin-top:8px;padding:0;}
+.expand-btn:hover{color:var(--ink);}
+
+/* ── ANALYSIS ── */
+.analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;}
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body { background: #fff !important; padding: 0; }
+  .app-header, .nav-tabs, .fx-bar, #tab-expenses, #tab-settlement, .toast { display: none !important; }
+  #tab-analysis { display: block !important; padding: 0 !important; }
+  #tab-analysis > div:first-child { display: none !important; } /* hide export btn */
+  .analysis-grid { grid-template-columns: 1fr 1fr !important; gap: 16px !important; }
+  .analysis-card { break-inside: avoid; border: 1px solid #E4DDD4 !important; box-shadow: none !important; }
+  .print-header { display: block !important; }
+  @page { margin: 1.5cm; size: A4; }
+}
+.print-header { display: none; font-family: var(--serif); margin-bottom: 20px; }
+.print-header h1 { font-size: 1.6rem; color: var(--ink); }
+.print-header p  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.analysis-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px;}
+.analysis-card h3{font-family:var(--serif);font-size:1rem;margin-bottom:16px;}
+.cat-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.cat-name{font-size:12px;width:110px;flex-shrink:0;color:var(--muted);}
+.cat-bar-wrap{flex:1;background:#F0EDE6;border-radius:4px;height:8px;}
+.cat-bar{height:8px;border-radius:4px;transition:width .4s;}
+.cat-amt{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:60px;text-align:right;}
+.person-spend-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.ps-name{font-size:12px;width:70px;flex-shrink:0;}
+.ps-bar-wrap{flex:1;background:#F0EDE6;border-radius:4px;height:10px;overflow:hidden;}
+.ps-bar{height:10px;border-radius:4px;}
+.ps-amt{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:60px;text-align:right;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;transform:translateY(60px);opacity:0;transition:all .25s;pointer-events:none;z-index:100;}
+.toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-title">Trip <span>Split</span></div>
+  <input class="trip-name-input" id="tripName" placeholder="Trip name…" value="Naples 2025">
+  <div style="display:flex;gap:8px;margin-left:auto;flex-shrink:0">
+    <button onclick="exportData()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;font-family:var(--body);font-size:13px;font-weight:500;padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background='rgba(255,255,255,.12)'">
+      ⬇ Save
+    </button>
+    <label style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;font-family:var(--body);font-size:13px;font-weight:500;padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.2)'" onmouseout="this.style.background='rgba(255,255,255,.12)'">
+      ⬆ Load
+      <input type="file" accept=".json" style="display:none" onchange="importData(this)">
+    </label>
+  </div>
+</header>
+
+<nav class="nav-tabs">
+  <div class="nav-tab active" onclick="switchTab('expenses')">Expenses</div>
+  <div class="nav-tab" onclick="switchTab('settlement')">Settlement</div>
+  <div class="nav-tab" onclick="switchTab('analysis')">Analysis</div>
+</nav>
+
+<div class="fx-bar" id="fxBar"></div>
+
+<!-- ══ EXPENSES TAB ══ -->
+<div class="section" id="tab-expenses">
+
+  <!-- People -->
+  <div class="people-bar" id="peopleBar"></div>
+
+  <!-- Import -->
+  <div class="import-zone" id="importZone" onclick="document.getElementById('xlsInput').click()"
+       ondragover="e=>e.preventDefault()" ondrop="handleDrop(event)">
+    <div class="icon">📂</div>
+    <p>Drag & drop your XLS/XLSX file here, or click to browse</p>
+    <p style="font-size:11px;margin-top:4px;">Expects: Date | Item | Person columns | Notes</p>
+    <label class="import-btn-label" onclick="event.stopPropagation()">
+      <input type="file" id="xlsInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importXLS(this)">
+      Browse file
+    </label>
+  </div>
+
+  <!-- Add / Edit form -->
+  <div class="form-card" id="formCard">
+    <div class="form-card-title">
+      <span id="formTitle">Add Expense</span>
+      <button class="btn-ghost" id="cancelEditBtn" style="display:none;font-size:12px" onclick="cancelEdit()">Cancel edit</button>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Description</label><input id="fDesc" type="text" placeholder="e.g. Hotel night 1"></div>
+      <div class="field"><label>Category</label>
+        <select id="fCat">
+          <option>Food</option><option>Transport</option><option>Accommodation</option>
+          <option>Activities</option><option>Shopping</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Date</label><input id="fDate" type="date"></div>
+      <div class="field"><label>Currency</label>
+        <select id="fCcy" onchange="onCcyChange()">
+          <option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Skip / Note</label>
+        <select id="fSkip">
+          <option value="">Count it</option>
+          <option value="skip">Skip (don't count)</option>
+        </select>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="sub-section">
+        <div class="sub-label"><span style="width:7px;height:7px;border-radius:50%;background:#3B82F6;display:inline-block"></span>Who paid & how much?</div>
+        <div id="paidGrid"></div>
+      </div>
+      <div class="sub-section">
+        <div class="sub-label"><span style="width:7px;height:7px;border-radius:50%;background:#10B981;display:inline-block"></span>Split among whom? <span style="font-weight:400;color:var(--muted);font-size:9px;margin-left:4px">(even by default)</span></div>
+        <div id="shareGrid"></div>
+        <div id="shareStatus" class="share-status"></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" id="submitBtn" onclick="submitExpense()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span id="submitLabel">Add Expense</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Currency totals -->
+  <div class="ccy-totals" id="ccyTotals"></div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <div class="table-head-bar">
+      <h3>All Expenses</h3>
+      <span class="pill" id="expCount">0 entries</span>
+    </div>
+    <div style="overflow-x:auto"><table class="tbl"><thead><tr id="tableHead"></tr></thead><tbody id="tableBody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ══ SETTLEMENT TAB ══ -->
+<div class="section section-hidden" id="tab-settlement">
+  <div class="transfers-box" id="transfersBox"></div>
+  <div class="settle-summary" id="settleSummary"></div>
+</div>
+
+<!-- ══ ANALYSIS TAB ══ -->
+<div class="section section-hidden" id="tab-analysis">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <button onclick="exportPDF()" style="background:var(--ink);color:#fff;border:none;border-radius:9px;padding:9px 18px;font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;">
+      🖨 Export PDF
+    </button>
+  </div>
+  <div class="print-header" id="printHeader"></div>
+  <div class="analysis-grid" id="analysisGrid"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ STATE ══════════════════════════════════════════════════════════
+
+const NAPLES_DATA = {"people": [{"id": "p0", "name": "61", "color": "#E8547A"}, {"id": "p1", "name": "Eva", "color": "#3B82F6"}, {"id": "p2", "name": "Deborah", "color": "#10B981"}], "fx": {"EUR": 1.0, "USD": 0.85, "GBP": 1.15}, "expenses": [{"desc": "三明治", "cat": "Food", "date": "2026-04-25", "ccy": "GBP", "rate": 1.15, "paid": [{"orig": 16.8, "eur": 19.32}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 19.32, "shares": [9.66, 0.0, 9.66], "isEven": false, "included": [true, false, true], "skip": false, "note": "61帮deborah付8.4磅"}, {"desc": "水", "cat": "Food", "date": "2026-04-25", "ccy": "GBP", "rate": 1.15, "paid": [{"orig": 3.9, "eur": 4.48}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 4.48, "shares": [2.24, 2.24, 0.0], "isEven": false, "included": [true, true, false], "skip": false, "note": "61帮Eva付1.95磅"}, {"desc": "airbnb", "cat": "Accommodation", "date": "2026-04-25", "ccy": "USD", "rate": 0.85, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 638.09, "eur": 542.38}, {"orig": 0.0, "eur": 0.0}], "totalEur": 542.38, "shares": [180.79, 180.79, 180.8], "isEven": true, "included": [true, true, true], "skip": false, "note": "1 USD = 0.85 GBP"}, {"desc": "机场到airbnb", "cat": "Accommodation", "date": "2026-04-25", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 35.0, "eur": 35.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 35.0, "shares": [11.67, 11.67, 11.66], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "pizza", "cat": "Food", "date": "2026-04-25", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 41.5, "eur": 41.5}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 41.5, "shares": [13.83, 13.83, 13.84], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "超市", "cat": "Food", "date": "2026-04-25", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 0.0, "shares": [0.0, 0.0, 0.0], "isEven": true, "included": [true, true, true], "skip": true, "note": ""}, {"desc": "公交", "cat": "Transport", "date": "2026-04-25", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 5.4, "eur": 5.4}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 5.4, "shares": [1.8, 1.8, 1.8], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "打车回airbnb", "cat": "Accommodation", "date": "2026-04-25", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 16.53, "eur": 16.53}, {"orig": 0.0, "eur": 0.0}], "totalEur": 16.53, "shares": [5.51, 5.51, 5.51], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "it’s 早饭", "cat": "Food", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 45.0, "eur": 45.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 45.0, "shares": [15.0, 15.0, 15.0], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "napoli-capri", "cat": "Transport", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 88.5, "eur": 88.5}], "totalEur": 88.5, "shares": [29.5, 29.5, 29.5], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "冰淇淋", "cat": "Food", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0, "eur": 0}, {"orig": 0, "eur": 0}, {"orig": 14.0, "eur": 14.0}], "totalEur": 14.0, "shares": [5.2, 5.2, 3.6], "isEven": false, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "饮料", "cat": "Food", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 13, "eur": 13}, {"orig": 0, "eur": 0}, {"orig": 0, "eur": 0}], "totalEur": 13.0, "shares": [6.0, 0.0, 7.0], "isEven": false, "included": [true, false, true], "skip": false, "note": "61帮Deborah付6.5欧"}, {"desc": "round trip bus", "cat": "Transport", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 14.4, "eur": 14.4}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 14.4, "shares": [4.8, 4.8, 4.8], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "咖啡店", "cat": "Food", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 22.0, "eur": 22.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 22.0, "shares": [7.33, 7.33, 7.34], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "npc晚饭", "cat": "Food", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 89.3, "eur": 89.3}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 89.3, "shares": [29.77, 29.77, 29.76], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "capri-napoli", "cat": "Transport", "date": "2026-04-26", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 69.4, "eur": 69.4}], "totalEur": 69.4, "shares": [23.13, 23.13, 23.14], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "奶香小面包", "cat": "Food", "date": "2026-04-27", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 0.0, "shares": [0.0, 0.0, 0.0], "isEven": true, "included": [true, true, true], "skip": true, "note": ""}, {"desc": "中饭", "cat": "Food", "date": "2026-04-27", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 46.0, "eur": 46.0}], "totalEur": 46.0, "shares": [15.33, 15.33, 15.34], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "导览器", "cat": "Activities", "date": "2026-04-27", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 24.0, "eur": 24.0}], "totalEur": 24.0, "shares": [8.0, 8.0, 8.0], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "橙汁", "cat": "Food", "date": "2026-04-27", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0, "eur": 0}, {"orig": 0, "eur": 0}, {"orig": 8, "eur": 8}], "totalEur": 8.0, "shares": [0.0, 4.0, 4.0], "isEven": false, "included": [false, true, true], "skip": false, "note": ""}, {"desc": "fanta+饮料", "cat": "Food", "date": "2026-04-27", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 9.0, "eur": 9.0}], "totalEur": 9.0, "shares": [3.0, 3.0, 3.0], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "火山bus+门票", "cat": "Transport", "date": "2026-04-27", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 90.0, "eur": 90.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 90.0, "shares": [30.0, 30.0, 30.0], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "晚饭", "cat": "Food", "date": "2026-04-27", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 73.5, "eur": 73.5}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 73.5, "shares": [24.5, 24.5, 24.5], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "早饭", "cat": "Food", "date": "2026-04-28", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 54.0, "eur": 54.0}], "totalEur": 54.0, "shares": [18.0, 18.0, 18.0], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "奶油包", "cat": "Other", "date": "2026-04-28", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}, {"orig": 0.0, "eur": 0.0}], "totalEur": 0.0, "shares": [0.0, 0.0, 0.0], "isEven": true, "included": [true, true, true], "skip": true, "note": ""}, {"desc": "蒙纱耶稣", "cat": "Other", "date": "2026-04-28", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0, "eur": 0}, {"orig": 38, "eur": 38}, {"orig": 0, "eur": 0}], "totalEur": 38.0, "shares": [12.0, 15.0, 11.0], "isEven": false, "included": [true, true, true], "skip": false, "note": ""}, {"desc": "uber去机场", "cat": "Transport", "date": "2026-04-28", "ccy": "EUR", "rate": 1.0, "paid": [{"orig": 0.0, "eur": 0.0}, {"orig": 23.8, "eur": 23.8}, {"orig": 0.0, "eur": 0.0}], "totalEur": 23.8, "shares": [7.93, 7.93, 7.94], "isEven": true, "included": [true, true, true], "skip": false, "note": ""}]};
+
+const APP = {
+  tripName: 'Naples 2025',
+  people: [
+    {id:'p0',name:'61',color:'#E8547A'},
+    {id:'p1',name:'Bob',  color:'#3B82F6'},
+    {id:'p2',name:'Carol',color:'#10B981'},
+  ],
+  fx: {EUR:1, USD:0.85, GBP:1.15},
+  expenses: [],
+  editIdx: null
+};
+let F = {included:[], overrides:[]};
+const SYM = {EUR:'€',USD:'$',GBP:'£'};
+const CAT_COLORS = {Food:'#F59E0B',Transport:'#3B82F6',Accommodation:'#8B5CF6',Activities:'#10B981',Shopping:'#E8547A',Other:'#78716C'};
+
+// ══ INIT ══════════════════════════════════════════════════════════
+window.onload = () => {
+  // Load Naples data
+  APP.people = NAPLES_DATA.people;
+  APP.fx = NAPLES_DATA.fx;
+  APP.expenses = NAPLES_DATA.expenses;
+  document.getElementById('tripName').value = 'Naples Apr 2026';
+  document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tripName').oninput = e => APP.tripName = e.target.value;
+  buildFxBar(); buildPeopleBar(); resetForm(); render();
+};
+
+// ══ TABS ══════════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.nav-tab').forEach((t,i)=>{
+    const tabs=['expenses','settlement','analysis'];
+    t.classList.toggle('active', tabs[i]===name);
+  });
+  ['expenses','settlement','analysis'].forEach(t=>{
+    const el=document.getElementById(`tab-${t}`);
+    el.classList.toggle('section-hidden',t!==name);
+  });
+  if(name==='settlement') renderSettlement();
+  if(name==='analysis') renderAnalysis();
+}
+
+// ══ PEOPLE ════════════════════════════════════════════════════════
+const PERSON_COLORS = ['#E8547A','#3B82F6','#10B981','#F59E0B','#8B5CF6'];
+function buildPeopleBar() {
+  const bar = document.getElementById('peopleBar');
+  bar.innerHTML = APP.people.map((p,i)=>`
+    <div class="person-chip" style="border-color:${p.color}20;background:${p.color}08">
+      <span class="pdot" style="background:${p.color}"></span>
+      <input value="${p.name}" oninput="renamePerson('${p.id}',this.value)" style="color:${p.color}">
+      ${APP.people.length>2?`<button class="rm-person" onclick="removePerson('${p.id}')">×</button>`:''}
+    </div>`).join('');
+  if(APP.people.length<5) bar.innerHTML+=`<button class="add-person-btn" onclick="addPerson()">＋ Add person</button>`;
+  rebuildPaidGrid(); rebuildShareGrid();
+}
+function renamePerson(id,name){ const p=APP.people.find(x=>x.id===id); if(p){p.name=name;} rebuildPaidGrid();rebuildShareGrid();renderTableHead();renderSettlement(); }
+function addPerson(){
+  const id='p'+Date.now();
+  const color=PERSON_COLORS[APP.people.length%PERSON_COLORS.length];
+  APP.people.push({id,name:`Person ${APP.people.length+1}`,color});
+  // add slot to all existing expenses
+  APP.expenses.forEach(e=>{ e.paid.push({orig:0,eur:0}); e.shares.push(0); e.included.push(false); });
+  buildPeopleBar(); render();
+}
+function removePerson(id){
+  if(APP.people.length<=2){toast('Need at least 2 people');return;}
+  const idx=APP.people.findIndex(p=>p.id===id);
+  APP.people.splice(idx,1);
+  APP.expenses.forEach(e=>{ e.paid.splice(idx,1); e.shares.splice(idx,1); e.included.splice(idx,1); });
+  buildPeopleBar(); render();
+}
+
+// ══ FX ════════════════════════════════════════════════════════════
+function buildFxBar(){
+  const n=APP.people.length;
+  // show running totals per currency
+  const totals={EUR:0,USD:0,GBP:0};
+  APP.expenses.filter(e=>!e.skip).forEach(e=>{
+    const raw=e.paid.reduce((s,p)=>s+p.orig,0);
+    totals[e.ccy]=(totals[e.ccy]||0)+raw;
+  });
+  document.getElementById('fxBar').innerHTML=`
+    <span class="fx-label">💱 Rates → EUR</span>
+    ${['USD','GBP'].map(ccy=>`
+      <div class="fx-bucket">
+        <span class="fx-bucket-label" style="color:${ccy==='USD'?'#1D4ED8':'#7C3AED'}">1 ${ccy} =</span>
+        <input class="fx-input" type="text" inputmode="decimal" value="${APP.fx[ccy]}"
+               onchange="APP.fx['${ccy}']=parseFloat(this.value)||1;buildFxBar();render()"
+               onblur="APP.fx['${ccy}']=parseFloat(this.value)||1;buildFxBar();render()">
+        <span style="font-family:var(--mono);font-size:11px;color:#92400E">EUR</span>
+        <span class="fx-total">${SYM[ccy]}${totals[ccy].toFixed(2)} total → €${(totals[ccy]*APP.fx[ccy]).toFixed(2)}</span>
+      </div>`).join('')}
+    <div class="fx-bucket">
+      <span class="fx-bucket-label" style="color:#7C3AED">Settlement in</span>
+      <span class="fx-input" style="padding:3px 9px;background:#EDE9FE;color:#5B21B6;border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:600;border:1px solid #DDD6FE">GBP £</span>
+    </div>`;
+}
+
+// ══ FORM ══════════════════════════════════════════════════════════
+function onCcyChange(){
+  const sym=SYM[document.getElementById('fCcy').value]||'';
+  rebuildPaidGrid(sym); updateHints(); recalcShareGrid();
+}
+function resetForm(){
+  F={included:APP.people.map(()=>true), overrides:APP.people.map(()=>null)};
+  APP.editIdx=null;
+  document.getElementById('fDesc').value='';
+  document.getElementById('fCcy').value='EUR';
+  document.getElementById('fSkip').value='';
+  document.getElementById('formTitle').textContent='Add Expense';
+  document.getElementById('submitLabel').textContent='Add Expense';
+  document.getElementById('cancelEditBtn').style.display='none';
+  rebuildPaidGrid(); rebuildShareGrid();
+}
+function rebuildPaidGrid(sym){
+  const ccy=document.getElementById('fCcy')?.value||'EUR';
+  const s=sym||(SYM[ccy]||'');
+  document.getElementById('paidGrid').innerHTML=APP.people.map((p,i)=>`
+    <div class="paid-row">
+      <span class="paid-row-name"><span class="pdot" style="background:${p.color};width:8px;height:8px;border-radius:50%;display:inline-block"></span>${p.name}</span>
+      <input type="number" id="fPaid${i}" step="0.01" min="0" placeholder="${s}0.00" oninput="onPaidChange()">
+      <span class="paid-hint" id="fHint${i}"></span>
+    </div>`).join('');
+}
+function updateHints(){
+  const ccy=document.getElementById('fCcy')?.value||'EUR';
+  const rate=APP.fx[ccy]||1;
+  APP.people.forEach((_,i)=>{
+    const v=parseFloat(document.getElementById(`fPaid${i}`)?.value)||0;
+    const el=document.getElementById(`fHint${i}`);
+    if(el) el.textContent=(v&&ccy!=='EUR')?`€${(v*rate).toFixed(2)}`:'';
+  });
+}
+function onPaidChange(){ F.overrides=APP.people.map(()=>null); updateHints(); recalcShareGrid(); }
+function getEurTotalFromForm(){
+  const rate=APP.fx[document.getElementById('fCcy')?.value||'EUR']||1;
+  return APP.people.reduce((s,_,i)=>{
+    const v=parseFloat(document.getElementById(`fPaid${i}`)?.value)||0;
+    return s+v*rate;
+  },0);
+}
+
+function rebuildShareGrid(){
+  document.getElementById('shareGrid').innerHTML=APP.people.map((p,i)=>{
+    const on=F.included[i];
+    const ov=F.overrides[i];
+    return `
+    <div class="share-row">
+      <label class="chip-toggle">
+        <input type="checkbox" id="fIncl${i}" ${on?'checked':''} onchange="onToggle(${i})">
+        <span class="chip-face" style="${on?`background:${p.color};border-color:${p.color};color:#fff`:''}">
+          <span class="pdot" style="background:${on?'rgba(255,255,255,.6)':p.color};width:7px;height:7px;border-radius:50%;display:inline-block"></span>
+          ${p.name}
+        </span>
+      </label>
+      <div class="share-amount-wrap">
+        <input type="number" id="fShare${i}" step="0.01" min="0"
+               value="${ov!==null?ov:''}" placeholder="auto"
+               ${!on?'disabled':''}
+               oninput="onShareInput(${i})">
+      </div>
+    </div>`;
+  }).join('');
+  recalcShareGrid();
+}
+function onToggle(i){ F.included[i]=document.getElementById(`fIncl${i}`).checked; F.overrides[i]=null; rebuildShareGrid(); }
+function onShareInput(i){ const v=document.getElementById(`fShare${i}`).value; F.overrides[i]=v===''?null:parseFloat(v); recalcShareGrid(); }
+function recalcShareGrid(){
+  const total=getEurTotalFromForm();
+  const incl=APP.people.map((_,i)=>i).filter(i=>F.included[i]);
+  if(!incl.length){setShareStatus('','');return;}
+  let mSum=0,mCnt=0;
+  incl.forEach(i=>{if(F.overrides[i]!==null){mSum+=F.overrides[i];mCnt++;}});
+  const autoCnt=incl.length-mCnt;
+  const autoSh=autoCnt>0?Math.max(0,(total-mSum)/autoCnt):0;
+  incl.forEach(i=>{
+    const el=document.getElementById(`fShare${i}`);
+    if(el&&F.overrides[i]===null) el.placeholder=total>0?`€${autoSh.toFixed(2)}`:'auto';
+  });
+  const assigned=mSum+autoSh*autoCnt, diff=total-assigned, abs=Math.abs(diff);
+  if(!total) setShareStatus('','');
+  else if(abs<0.02) setShareStatus(`✓ €${total.toFixed(2)}`,'ss-ok');
+  else if(diff<0)   setShareStatus(`Over by €${abs.toFixed(2)}`,'ss-over');
+  else              setShareStatus(`€${diff.toFixed(2)} auto-split`,'ss-auto');
+}
+function setShareStatus(txt,cls){
+  const el=document.getElementById('shareStatus');
+  el.textContent=txt; el.className='share-status'+(cls?' '+cls:'');
+}
+function resolveShares(totalEur){
+  const incl=APP.people.map((_,i)=>i).filter(i=>F.included[i]);
+  let mSum=0,mCnt=0;
+  incl.forEach(i=>{if(F.overrides[i]!==null){mSum+=F.overrides[i];mCnt++;}});
+  const autoCnt=incl.length-mCnt;
+  const autoSh=autoCnt>0?Math.max(0,(totalEur-mSum)/autoCnt):0;
+  return APP.people.map((_,i)=>{
+    if(!F.included[i]) return 0;
+    if(F.overrides[i]!==null) return +F.overrides[i].toFixed(2);
+    return +autoSh.toFixed(2);
+  });
+}
+
+// ══ ADD / EDIT / DELETE ══════════════════════════════════════════
+function submitExpense(){
+  const desc=document.getElementById('fDesc').value.trim();
+  const cat=document.getElementById('fCat').value;
+  const date=document.getElementById('fDate').value;
+  const ccy=document.getElementById('fCcy').value;
+  const skip=document.getElementById('fSkip').value==='skip';
+  const rate=APP.fx[ccy]||1;
+  if(!desc){toast('Add a description!');return;}
+
+  const paid=APP.people.map((_,i)=>{
+    const v=parseFloat(document.getElementById(`fPaid${i}`)?.value)||0;
+    return {orig:v,eur:+(v*rate).toFixed(2)};
+  });
+  const totalEur=+(paid.reduce((s,p)=>s+p.eur,0)).toFixed(2);
+  if(!skip&&totalEur===0){toast('Enter at least one amount, or mark as skip');return;}
+
+  const shares=resolveShares(totalEur);
+  const inclCount=F.included.filter(Boolean).length;
+  const evenSh=inclCount?+(totalEur/inclCount).toFixed(2):0;
+  const isEven=F.included.every((_,i)=>!F.included[i]||(Math.abs(shares[i]-evenSh)<0.02));
+
+  const entry={desc,cat,date,ccy,rate,paid,totalEur,shares,isEven,included:[...F.included],skip};
+  if(APP.editIdx!==null){ APP.expenses[APP.editIdx]=entry; toast('Expense updated'); }
+  else { APP.expenses.push(entry); toast('Added!'); }
+
+  resetForm(); render(); buildFxBar();
+}
+
+function editExpense(idx){
+  const e=APP.expenses[idx];
+  APP.editIdx=idx;
+  document.getElementById('fDesc').value=e.desc;
+  document.getElementById('fCat').value=e.cat;
+  document.getElementById('fDate').value=e.date;
+  document.getElementById('fCcy').value=e.ccy;
+  document.getElementById('fSkip').value=e.skip?'skip':'';
+  document.getElementById('formTitle').textContent='Edit Expense';
+  document.getElementById('submitLabel').textContent='Save Changes';
+  document.getElementById('cancelEditBtn').style.display='';
+  F.included=[...e.included];
+  F.overrides=e.shares.map((s,i)=>e.included[i]&&!e.isEven?s:null);
+  rebuildPaidGrid(); rebuildShareGrid();
+  // fill paid values
+  e.paid.forEach((p,i)=>{ const el=document.getElementById(`fPaid${i}`); if(el) el.value=p.orig||''; });
+  updateHints(); recalcShareGrid();
+  document.getElementById('formCard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cancelEdit(){ APP.editIdx=null; resetForm(); }
+function deleteExpense(idx){ if(!confirm('Delete this expense?')) return; APP.expenses.splice(idx,1); if(APP.editIdx===idx){resetForm();} render(); buildFxBar(); toast('Deleted'); }
+
+// ══ RENDER ════════════════════════════════════════════════════════
+function render(){ renderTableHead(); renderBody(); renderCcyTotals(); }
+
+function renderTableHead(){
+  const pc=APP.people.map(p=>`<th class="h-paid">${p.name} paid</th>`).join('');
+  const sc=APP.people.map(p=>`<th class="h-share">${p.name} owes</th>`).join('');
+  document.getElementById('tableHead').innerHTML=`
+    <th>Date</th><th>Description</th><th>Category</th><th class="h-paid">CCY</th>${pc}${sc}<th></th>`;
+}
+
+function renderBody(){
+  const tbody=document.getElementById('tableBody');
+  document.getElementById('expCount').textContent=`${APP.expenses.length} entries`;
+  if(!APP.expenses.length){
+    tbody.innerHTML=`<tr><td colspan="20"><div class="empty-state">🧾 No expenses yet</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML=APP.expenses.map((e,idx)=>{
+    const sym=SYM[e.ccy]||e.ccy;
+    const editing=APP.editIdx===idx;
+    const pc=e.paid.map((p,pi)=>{
+      if(!p.eur&&!p.orig) return `<td class="c-paid mono" style="color:var(--border)">—</td>`;
+      const hint=e.ccy!=='EUR'?`<br><span style="font-size:9px;color:var(--muted)">${sym}${p.orig.toFixed(2)}</span>`:'';
+      return `<td class="c-paid mono" style="color:${APP.people[pi].color};font-weight:600">€${p.eur.toFixed(2)}${hint}</td>`;
+    }).join('');
+    const sc=e.shares.map((sh,pi)=>{
+      if(!e.included[pi]) return `<td class="c-share mono" style="color:var(--border)">—</td>`;
+      return `<td class="c-share mono" style="color:#065F46">€${sh.toFixed(2)}</td>`;
+    }).join('');
+    const tags=(e.skip?`<span class="skip-tag">skip</span>`:'')+((!e.isEven&&!e.skip)?`<span class="custom-tag">custom</span>`:'');
+    return `<tr class="${editing?'editing':''}">
+      <td class="mono" style="color:var(--muted);font-size:11px">${e.date||'—'}</td>
+      <td style="max-width:180px;font-weight:500">${e.desc}${tags}</td>
+      <td><span style="font-size:11px;color:${CAT_COLORS[e.cat]||'#78716C'};font-weight:600">${e.cat}</span></td>
+      <td class="mono"><span class="ccy-tag ccy-${e.ccy}">${e.ccy}</span></td>
+      ${pc}${sc}
+      <td><div class="row-actions">
+        <button class="icon-btn" onclick="editExpense(${idx})" title="Edit">✏️</button>
+        <button class="icon-btn del" onclick="deleteExpense(${idx})" title="Delete">✕</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCcyTotals(){
+  // Sum per currency (skip excluded entries)
+  const buckets={};
+  APP.expenses.filter(e=>!e.skip).forEach(e=>{
+    if(!buckets[e.ccy]) buckets[e.ccy]={raw:0,eur:0};
+    buckets[e.ccy].raw+=e.paid.reduce((s,p)=>s+p.orig,0);
+    buckets[e.ccy].eur+=e.totalEur;
+  });
+  const colors={EUR:'#2D6A4F',USD:'#1D4ED8',GBP:'#7C3AED'};
+  document.getElementById('ccyTotals').innerHTML=Object.entries(buckets).map(([ccy,b])=>`
+    <div class="ccy-card">
+      <div class="ccy-card-label" style="color:${colors[ccy]||'#78716C'}">${ccy} ${SYM[ccy]||''}</div>
+      <div class="ccy-card-total" style="color:${colors[ccy]||'#78716C'}">${SYM[ccy]||''}${b.raw.toFixed(2)}</div>
+      <div class="ccy-card-eur">→ €${b.eur.toFixed(2)} at rate ${APP.fx[ccy]||1}</div>
+    </div>`).join('')+`
+    <div class="ccy-card">
+      <div class="ccy-card-label">Grand Total</div>
+      <div class="ccy-card-total" style="color:#2D6A4F">€${APP.expenses.filter(e=>!e.skip).reduce((s,e)=>s+e.totalEur,0).toFixed(2)}</div>
+      <div class="ccy-card-eur">converted to EUR</div>
+    </div>`;
+}
+
+// ══ SETTLEMENT ════════════════════════════════════════════════════
+// Convert an expense amount to GBP:
+// GBP stays as-is (orig), EUR and USD convert via rates
+function toGbp(amount, ccy) {
+  if (ccy === 'GBP') return amount; // no conversion needed
+  const eurToGbp = 1 / APP.fx['GBP']; // GBP->EUR inverted
+  if (ccy === 'EUR') return amount * eurToGbp;
+  // USD: amount is already in EUR equivalent (orig * usd_rate), convert EUR->GBP
+  return amount * eurToGbp;
+}
+
+// Get per-person paid and share amounts in GBP for an expense
+function expenseInGbp(e, personIdx) {
+  if (e.ccy === 'GBP') {
+    // Use original GBP amounts directly
+    return {
+      paid: e.paid[personIdx].orig,
+      share: e.shares[personIdx] / e.rate  // shares stored in EUR, convert back to GBP
+    };
+  }
+  // EUR or USD: already in EUR, convert to GBP
+  const eurToGbp = 1 / APP.fx['GBP'];
+  return {
+    paid:  e.paid[personIdx].eur  * eurToGbp,
+    share: (e.shares[personIdx] || 0) * eurToGbp
+  };
+}
+
+function renderSettlement(){
+  // Build per-person totals in GBP
+  const pp = APP.people.map((p, i) => {
+    let paid = 0, share = 0;
+    APP.expenses.filter(e => !e.skip).forEach(e => {
+      const g = expenseInGbp(e, i);
+      paid  += g.paid;
+      share += g.share;
+    });
+    return { name: p.name, color: p.color,
+             paid: +paid.toFixed(2), share: +share.toFixed(2),
+             balance: +(paid - share).toFixed(2) };
+  });
+
+  // Minimal transfers (in GBP)
+  const bs = pp.map(p => ({ name: p.name, b: p.balance }));
+  const transfers = [];
+  for (let it = 0; it < 30; it++) {
+    const pay = bs.filter(x => x.b < -0.01).sort((a,b) => a.b - b.b);
+    const rec = bs.filter(x => x.b >  0.01).sort((a,b) => b.b - a.b);
+    if (!pay.length || !rec.length) break;
+    const amt = Math.min(-pay[0].b, rec[0].b);
+    transfers.push({ from: pay[0].name, to: rec[0].name, gbp: +amt.toFixed(2) });
+    pay[0].b = +(pay[0].b + amt).toFixed(2);
+    rec[0].b = +(rec[0].b - amt).toFixed(2);
+  }
+
+  const tLines = transfers.length
+    ? transfers.map(t => `<div class="transfer-line">
+        <span>${t.from}</span><span class="arrow">→</span><span>${t.to}</span>
+        <span class="gbp-amt">£${t.gbp.toFixed(2)}</span>
+      </div>`).join('')
+    : `<div class="no-transfer">✓ Everyone is settled — no transfers needed</div>`;
+  document.getElementById('transfersBox').innerHTML = `<h3>💸 How to settle up</h3>${tLines}`;
+
+  // Person cards
+  document.getElementById('settleSummary').innerHTML = pp.map((p, i) => {
+    const bc = p.balance > 0.01 ? 'bp-pos' : p.balance < -0.01 ? 'bp-neg' : 'bp-zero';
+    const bt = p.balance > 0.01 ? `Gets back £${p.balance.toFixed(2)}`
+             : p.balance < -0.01 ? `Owes £${Math.abs(p.balance).toFixed(2)}`
+             : '✓ Settled';
+
+    const items = APP.expenses.filter(e => !e.skip).map(e => {
+      const g = expenseInGbp(e, i);
+      if (!g.paid && !g.share) return '';
+      const sym = e.ccy === 'GBP' ? '£' : '€';
+      const paidDisp  = e.ccy === 'GBP' ? e.paid[i].orig  : e.paid[i].eur;
+      const shareDisp = e.ccy === 'GBP' ? g.share          : e.shares[i] || 0;
+      return `<div class="detail-row">
+        <span>${e.desc}</span>
+        <span style="font-family:var(--mono);font-size:11px">paid ${sym}${paidDisp.toFixed(2)} / owes ${sym}${shareDisp.toFixed(2)}</span>
+      </div>`;
+    }).filter(Boolean).join('');
+
+    return `<div class="person-settle-card" style="border-color:${p.color}30">
+      <div class="psc-name"><span class="pdot" style="background:${p.color};width:10px;height:10px;border-radius:50%;display:inline-block"></span>${p.name}</div>
+      <div class="psc-row"><span class="psc-label">Paid out</span><span class="psc-val">£${p.paid.toFixed(2)}</span></div>
+      <div class="psc-row"><span class="psc-label">Fair share</span><span class="psc-val">£${p.share.toFixed(2)}</span></div>
+      <div class="balance-pill ${bc}">${bt}</div>
+      ${items ? `
+      <button class="expand-btn" onclick="toggleDetail(this)">▶ Show itemized</button>
+      <div class="detail-panel">${items}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+function toggleDetail(btn){
+  const panel=btn.nextElementSibling;
+  const open=panel.classList.toggle('open');
+  btn.textContent=(open?'▼ Hide':'▶ Show')+' itemized';
+}
+
+// ══ ANALYSIS ══════════════════════════════════════════════════════
+function renderAnalysis(){
+  const active=APP.expenses.filter(e=>!e.skip);
+  const grand=active.reduce((s,e)=>s+e.totalEur,0);
+
+  // By category
+  const byCat={};
+  active.forEach(e=>{ byCat[e.cat]=(byCat[e.cat]||0)+e.totalEur; });
+  const catRows=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>{
+    const pct=grand?amt/grand*100:0;
+    return `<div class="cat-bar-row">
+      <div class="cat-name">${cat}</div>
+      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%;background:${CAT_COLORS[cat]||'#78716C'}"></div></div>
+      <div class="cat-amt">€${amt.toFixed(0)} <span style="color:var(--muted)">(${pct.toFixed(0)}%)</span></div>
+    </div>`;
+  }).join('');
+
+  // By person paid
+  const byPerson=APP.people.map((p,i)=>({
+    name:p.name,color:p.color,
+    paid:active.reduce((s,e)=>s+e.paid[i].eur,0),
+    share:active.reduce((s,e)=>s+(e.shares[i]||0),0)
+  }));
+  const maxPaid=Math.max(...byPerson.map(p=>p.paid),1);
+  const personRows=byPerson.map(p=>`
+    <div class="person-spend-row">
+      <div class="ps-name" style="color:${p.color};font-weight:600">${p.name}</div>
+      <div class="ps-bar-wrap"><div class="ps-bar" style="width:${p.paid/maxPaid*100}%;background:${p.color}"></div></div>
+      <div class="ps-amt">€${p.paid.toFixed(0)} paid / €${p.share.toFixed(0)} share</div>
+    </div>`).join('');
+
+  // Per-day spending
+  const byDay={};
+  active.forEach(e=>{ if(e.date){ byDay[e.date]=(byDay[e.date]||0)+e.totalEur; } });
+  const dayEntries=Object.entries(byDay).sort(([a],[b])=>a.localeCompare(b));
+  const maxDay=Math.max(...dayEntries.map(([,v])=>v),1);
+  const dayRows=dayEntries.map(([d,amt])=>{
+    const label=new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    return `<div class="cat-bar-row">
+      <div class="cat-name">${label}</div>
+      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${amt/maxDay*100}%;background:#3B82F6"></div></div>
+      <div class="cat-amt">€${amt.toFixed(0)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('analysisGrid').innerHTML=`
+    <div class="analysis-card"><h3>Spending by Category</h3>${catRows||'<p style="color:var(--muted);font-size:13px">No data yet</p>'}</div>
+    <div class="analysis-card"><h3>Who Paid What</h3>${personRows}</div>
+    <div class="analysis-card"><h3>Spending by Day</h3>${dayRows||'<p style="color:var(--muted);font-size:13px">No dates entered</p>'}</div>
+    <div class="analysis-card"><h3>Quick Stats</h3>
+      <div class="psc-row" style="padding:6px 0;border-bottom:1px dashed var(--border)"><span class="psc-label">Total expenses</span><span class="psc-val">€${grand.toFixed(2)}</span></div>
+      <div class="psc-row" style="padding:6px 0;border-bottom:1px dashed var(--border)"><span class="psc-label">Per person (avg)</span><span class="psc-val">€${APP.people.length?(grand/APP.people.length).toFixed(2):'0'}</span></div>
+      <div class="psc-row" style="padding:6px 0;border-bottom:1px dashed var(--border)"><span class="psc-label">No. of expenses</span><span class="psc-val">${active.length}</span></div>
+      <div class="psc-row" style="padding:6px 0;border-bottom:1px dashed var(--border)"><span class="psc-label">Skipped entries</span><span class="psc-val">${APP.expenses.filter(e=>e.skip).length}</span></div>
+      <div class="psc-row" style="padding:6px 0"><span class="psc-label">Days tracked</span><span class="psc-val">${Object.keys(byDay).length}</span></div>
+    </div>`;
+}
+
+// ══ XLS IMPORT ════════════════════════════════════════════════════
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('importZone').classList.remove('drag');
+  const file=e.dataTransfer.files[0];
+  if(file) processXLS(file);
+}
+function importXLS(input){
+  if(input.files[0]) processXLS(input.files[0]);
+}
+function processXLS(file){
+  if(typeof XLSX === 'undefined'){
+    toast('XLS import needs an internet connection to load. Your data is already pre-loaded!');
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){toast('File looks empty');return;}
+
+      // Detect header row (find row with most non-empty cells)
+      let hdrIdx=0;
+      let maxCells=0;
+      rows.slice(0,5).forEach((r,i)=>{ const c=r.filter(Boolean).length; if(c>maxCells){maxCells=c;hdrIdx=i;} });
+      const hdr=rows[hdrIdx].map(h=>String(h).trim().toLowerCase());
+
+      // Find columns
+      const dateCol=hdr.findIndex(h=>h.includes('date'));
+      const descCol=hdr.findIndex(h=>h.includes('item')||h.includes('desc')||h.includes('name')||h.includes('what'));
+      const noteCol=hdr.findIndex(h=>h.includes('note')||h.includes('remark')||h.includes('comment'));
+
+      // Person columns = everything between desc and note that looks like a name
+      const personCols=[];
+      const skipCols=new Set([dateCol<0?0:dateCol, descCol<0?1:descCol, noteCol<0?999:noteCol]);
+      hdr.forEach((h,i)=>{
+        if(!skipCols.has(i)&&h&&!['date','item','desc','description','note','notes','remark','currency','ccy','total','category'].some(k=>h.includes(k))){
+          personCols.push({idx:i,name:rows[hdrIdx][i]});
+        }
+      });
+
+      if(personCols.length===0){toast('Could not detect person columns. Expected: Date | Item | Person... | Notes');return;}
+
+      // Sync people list with detected names (if different)
+      const detectedNames=personCols.map(p=>String(p.name).trim()).filter(Boolean);
+      if(detectedNames.length>0){
+        // Rebuild people from file
+        while(APP.people.length<detectedNames.length&&APP.people.length<5){
+          const id='p'+Date.now()+APP.people.length;
+          APP.people.push({id,name:'',color:PERSON_COLORS[APP.people.length%PERSON_COLORS.length]});
+        }
+        detectedNames.forEach((name,i)=>{ if(APP.people[i]) APP.people[i].name=name; });
+        buildPeopleBar();
+      }
+
+      let imported=0;
+      rows.slice(hdrIdx+1).forEach(row=>{
+        if(row.every(c=>c===''||c===null||c===undefined)) return;
+        const desc=descCol>=0?String(row[descCol]||'').trim():'';
+        if(!desc) return;
+
+        // Detect skip from notes
+        const note=noteCol>=0?String(row[noteCol]||'').toLowerCase():'';
+        const skip=note.includes('skip')||note.includes('not count')||note.includes('exclude')||note.includes('ignore');
+
+        // Detect currency from notes
+        let ccy='EUR';
+        if(note.includes('usd')||note.includes('$')) ccy='USD';
+        else if(note.includes('gbp')||note.includes('£')||note.includes('pound')) ccy='GBP';
+        else if(note.includes('eur')||note.includes('€')) ccy='EUR';
+
+        const rate=APP.fx[ccy]||1;
+        const date=dateCol>=0&&row[dateCol]?formatDate(row[dateCol]):'';
+
+        // Read paid amounts
+        const paid=APP.people.map((_,pi)=>{
+          if(pi>=personCols.length) return {orig:0,eur:0};
+          const raw=row[personCols[pi].idx];
+          const v=parseFloat(String(raw).replace(/[^0-9.\-]/g,''))||0;
+          return {orig:v, eur:+(v*rate).toFixed(2)};
+        });
+        const totalEur=+(paid.reduce((s,p)=>s+p.eur,0)).toFixed(2);
+
+        // Parse which people are "in" based on who has non-zero in their column
+        // If only one person paid, check note for "for all" / names
+        const included=paid.map(p=>p.orig>0);
+        // If note says "for all" or everyone paid, include all
+        if(note.includes('for all')||note.includes('everyone')||included.every(v=>!v)){
+          included.fill(true);
+        }
+
+        const inclCount=included.filter(Boolean).length||1;
+        const evenSh=+(totalEur/inclCount).toFixed(2);
+        const shares=included.map(inc=>inc?evenSh:0);
+
+        APP.expenses.push({desc,cat:'Other',date,ccy,rate,paid,totalEur,shares,isEven:true,included,skip});
+        imported++;
+      });
+
+      buildFxBar(); render();
+      toast(`Imported ${imported} expenses!`);
+    }catch(err){
+      toast('Import error: '+err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function formatDate(val){
+  if(!val) return '';
+  if(typeof val==='number'){
+    // Excel serial date
+    const d=new Date(Math.round((val-25569)*86400*1000));
+    return d.toISOString().split('T')[0];
+  }
+  const s=String(val).trim();
+  // try dd/mm/yyyy or mm/dd/yyyy
+  const m=s.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+  if(m){
+    const y=m[3].length===2?'20'+m[3]:m[3];
+    return `${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  }
+  return s;
+}
+
+// ══ EXPORT / IMPORT ═══════════════════════════════════════════════
+function exportPDF(){
+  // Make sure analysis is rendered and print header is filled
+  renderAnalysis();
+  const trip = document.getElementById('tripName').value || 'Trip';
+  const total = APP.expenses.filter(e=>!e.skip).reduce((s,e)=>s+e.totalEur,0);
+  const date  = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('printHeader').innerHTML = `
+    <h1>${trip} — Expense Report</h1>
+    <p>Generated ${date} &nbsp;·&nbsp; ${APP.people.map(p=>p.name).join(', ')} &nbsp;·&nbsp; Total: €${total.toFixed(2)}</p>
+    <hr style="border:none;border-top:1px solid #E4DDD4;margin:12px 0">`;
+  // Switch to analysis tab silently so print captures it
+  ['expenses','settlement','analysis'].forEach(t=>{
+    document.getElementById(`tab-${t}`).classList.toggle('section-hidden', t!=='analysis');
+  });
+  setTimeout(()=>{ window.print(); }, 120);
+}
+
+function exportData(){
+  const payload = {
+    tripName: document.getElementById('tripName').value,
+    people:   APP.people,
+    fx:       APP.fx,
+    expenses: APP.expenses
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const name = (document.getElementById('tripName').value || 'trip').replace(/\s+/g,'-');
+  a.href = url; a.download = `${name}-expenses.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Saved! Reload this file later with Load ⬆');
+}
+
+function importData(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if(d.people)   APP.people   = d.people;
+      if(d.fx)       APP.fx       = d.fx;
+      if(d.expenses) APP.expenses = d.expenses;
+      if(d.tripName) document.getElementById('tripName').value = d.tripName;
+      buildFxBar(); buildPeopleBar(); resetForm(); render();
+      toast(`Loaded ${APP.expenses.length} expenses from file`);
+    } catch(e) {
+      toast('Could not read file — is it a valid Trip Split JSON?');
+    }
+  };
+  reader.readAsText(file);
+  input.value = ''; // reset so same file can be reloaded
+}
+
+
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>
